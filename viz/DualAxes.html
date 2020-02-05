@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style> /* set the CSS */
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 2px;
+}
+
+.axisSteelBlue text{
+  fill: steelblue;
+}
+
+.axisRed text{
+  fill: red;
+}
+
+</style>
+<body>
+    <h1>GDP growth and Gini coefficient</h1>
+
+    <div id="vis-container">
+    </div>
+
+<!-- load the d3.js library -->    	
+<script src="../vendor/d3/d3.js"></script>
+<script>
+
+var init_country_id = "BR";
+
+// set the dimensions and margins of the graph
+var margin = {top: 20, right: 100, bottom: 30, left: 100},
+    width = 1200 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+// set the ranges
+var x = d3.scaleTime().range([5, width]);
+var y0 = d3.scaleLinear().range([height, 0]);
+var y1 = d3.scaleLinear().range([height, 0]);
+
+// define the 1st line
+var valueline = d3.line()
+    .x(function(d) { return x(d.year); })
+    .y(function(d) { return y0(d.growth); });
+
+// define the 2nd line
+var valueline2 = d3.line()
+    .x(function(d) { return x(d.year); })
+    .y(function(d) { return y1(d.gini_index*100); });
+
+// append the svg obgect to the body of the page
+// appends a 'group' element to 'svg'
+// moves the 'group' element to the top left margin
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform",
+          "translate(" + margin.left + "," + margin.top + ")");
+
+// insert drop down box selection
+var dropdown = d3.select('#vis-container')
+    .insert("select", "svg")
+    .attr("id","selectedCountry")
+    .on("change", function(){
+        updateVis(document.getElementById("selectedCountry").value);
+});
+
+d3.tsv("../data/gini.tsv", function(error, data_gini) {
+    if (error) throw error;
+    d3.tsv("../data/countries.tsv", function(error, data_country) {
+        if(error) throw error;
+        dropdown.selectAll("option")
+            .data(d3.map(data_gini, function(d){return d.country;}).keys())
+            .enter().append("option")
+            .attr("value", function (d) { return d; })
+            .text(function (d) {
+                var country_name = data_country.filter(function(s){ return s.code == d })[0].name;
+                console.log(country_name);                    
+                return country_name;
+            });
+    });
+});
+
+var updateVis = function(country_id){
+    // Clear previous graph
+    svg.selectAll("*").remove();
+
+    // Get the data
+    d3.tsv("../data/gini.tsv", function(error, data_gini) {
+        if (error) throw error;
+        d3.tsv("../data/gdp_growth.tsv", function(error, data_gdp) {
+            if (error) throw error;
+            // format the data
+            data_gdp = data_gdp.filter(function(d){ return d.country == country_id });
+            data_gini = data_gini.filter(function(d){ return d.country == country_id });
+            console.log(data_gini);
+            console.log(data_gdp);
+
+            // Scale the range of the data
+            x.domain(d3.extent(data_gdp, function (d) { return d.year; }));
+            //y0.domain([d3.min(data_gdp, function(d) {return Math.min(d.growth);}), d3.max(data_gdp, function(d) {return Math.max(d.growth);})]);
+            //y1.domain([d3.min(data_gini, function(d) {return Math.min(d.gini_index)*100;}), d3.max(data_gini, function(d) {return Math.max(d.gini_index)*100; })]);
+            y0.domain([-10.0,15.0]);
+            y1.domain([0.0,100.0]);
+
+            // Add the valueline path.
+            svg.append("path")
+                .data([data_gdp])
+                .attr("class", "line")
+                .attr("d", valueline);
+
+            // Add the valueline2 path.
+            svg.append("path")
+                .data([data_gini])
+                .attr("class", "line")
+                .style("stroke", "red")
+                .attr("d", valueline2);
+
+            // Add the X Axis
+            svg.append("g")
+                .attr("transform", "translate(0," + (height+5) + ")")
+                .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+            // Add the Y0 Axis
+            svg.append("g")
+                .attr("class", "axisSteelBlue")
+                .call(d3.axisLeft(y0));
+
+            svg.append('text')
+                .text("GDP growth")
+                .attr('transform', 'translate(' + 20 +',' + (height/2) + ') rotate(-90)')
+                .attr('text-anchor', 'middle');
+
+            // Add the Y1 Axis
+            svg.append("g")
+                .attr("class", "axisRed")
+                .attr("transform", "translate( " + (width+10) + ", 0 )")
+                .call(d3.axisRight(y1));
+            
+            svg.append('text')
+                .text("Gini coefficient")
+                .attr('transform', 'translate(' + (width) +',' + (height/2) + ') rotate(-90)')
+                .attr('text-anchor', 'middle');           
+        });
+    });
+}
+
+updateVis(init_country_id);
+
+</script>
+</body>
